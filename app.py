@@ -7,19 +7,22 @@ import os
 st.set_page_config(page_title="MakerTrends | Power Tool Intelligence", layout="wide")
 
 # Custom Strict Palette CSS Injector (White, #014692 Blue, Black Text)
+# Custom Strict Palette CSS Injector (White, #014692 Blue, Black Text)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     
     /* Global Container Fixes */
     .main { background-color: #ffffff; font-family: 'Inter', sans-serif; color: #000000; }
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
+    /* FIXED: Increased padding-top from 1.5rem to 4rem to clear the Streamlit top menu */
+    .block-container { padding-top: 4rem !important; padding-bottom: 2rem !important; }
     
     /* Global Text Adjustments to Force True Black */
     p, span, label, sm, div { color: #000000 !important; }
     
     /* Header Branding Layout */
-    .brand-title { color: #014692 !important; font-weight: 800; font-size: 2.25rem; letter-spacing: -0.5px; }
+    /* FIXED: Added line-height buffer to prevent internal text clipping */
+    .brand-title { color: #014692 !important; font-weight: 800; font-size: 2.25rem; letter-spacing: -0.5px; line-height: 1.3; }
     .brand-subtitle { color: #444444 !important; font-size: 1rem; margin-bottom: 1.5rem; margin-top: 5px; }
     .accent-bar { width: 100%; height: 4px; background-color: #014692; border-radius: 2px; margin-bottom: 2.5rem; }
     
