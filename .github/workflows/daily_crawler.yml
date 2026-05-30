@@ -29,3 +29,12 @@ jobs:
       env:
         YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       run: python data_pipeline.py
+
+    - name: Commit and Push Updated Data Back to Repo
+      run: |
+        git config --global user.name "TrendBot"
+        git config --global user.email "actions@github.com"
+        touch youtube_power_tool_trends_history.csv youtube_power_tool_videos.csv
+        git add youtube_power_tool_trends_history.csv youtube_power_tool_videos.csv
+        git diff-index --quiet HEAD || git commit -m "Automated Telemetry Update: $(date +'%Y-%m-%d')"
+        git push
