@@ -96,48 +96,64 @@ with m3:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- VISUALIZATION MATRICES ---
+# --- ENHANCED VISUALIZATION MATRICES (BI DESIGN UPGRADE) ---
 c_left, c_right = st.columns([1, 1])
 
 with c_left:
     st.markdown('<div class="section-header">Maximum Occurring Trend Matrix</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-caption">Bubble graph mapping tracking metrics. Size correlates directly with total phrase occurrences.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">Clean editorial data view mapping tracking metrics. Bubble scale indicates cumulative days logged.</div>', unsafe_allow_html=True)
     
-    # Process occurrence totals explicitly for bubble size configuration
     bubble_data = hist_df.groupby("trend_phrase").agg(
         occurrences=("trend_phrase", "count"),
         avg_relevance=("relevance_score", "mean")
-    ).reset_index().sort_values("occurrences", ascending=False).head(15)
+    ).reset_index().sort_values("occurrences", ascending=False).head(12)
     
     fig_bubble = px.scatter(
         bubble_data, 
         x="avg_relevance", 
         y="occurrences", 
         text="trend_phrase",
-        size="occurrences",        # Bubble size perfectly driven by frequency count
+        size="occurrences",        
         color="occurrences",       
-        size_max=45,               
+        size_max=40, # Sets strict clean sizing bounds
         color_continuous_scale=["#9cc2ef", "#014692"], 
-        labels={"avg_relevance": "Average Relevance Weight", "occurrences": "Total Recorded Occurrences"}
+        labels={"avg_relevance": "AVERAGE RELEVANCE WEIGHT", "occurrences": "TOTAL ACCUMULATED OCCURRENCES"}
     )
     
+    # --- TABLEAU STYLE CLEANUP CONFIGURATIONS ---
     fig_bubble.update_traces(
         textposition='top center', 
-        marker=dict(line=dict(width=1.5, color='#ffffff'))
+        cliponaxis=False, # Prevents text labels from being chopped off at the edges
+        marker=dict(
+            line=dict(width=1.5, color='#ffffff'), # Sharp white separator borders around bubbles
+            opacity=0.95
+        )
     )
     fig_bubble.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)", 
+        plot_bgcolor="rgba(0,0,0,0)", # Strips gray background box
         paper_bgcolor="rgba(0,0,0,0)",
         coloraxis_showscale=False, 
-        margin=dict(t=15, b=15, l=15, r=15),
-        xaxis=dict(showgrid=True, gridcolor="#eef1f5", zeroline=False, title_font=dict(color="black"), tickfont=dict(color="black")),
-        yaxis=dict(showgrid=True, gridcolor="#eef1f5", zeroline=False, title_font=dict(color="black"), tickfont=dict(color="black"))
+        margin=dict(t=30, b=40, l=40, r=40), # Generous baseline canvas margins
+        xaxis=dict(
+            showgrid=True, 
+            gridcolor="#f0f3f6", # Extremely faint, soft horizontal tracking lines
+            zeroline=False, 
+            title_font=dict(size=11, family="Inter", color="#444444"), 
+            tickfont=dict(size=10, family="Inter", color="#888888")
+        ),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor="#f0f3f6", 
+            zeroline=False, 
+            title_font=dict(size=11, family="Inter", color="#444444"), 
+            tickfont=dict(size=10, family="Inter", color="#888888")
+        )
     )
     st.plotly_chart(fig_bubble, use_container_width=True, config={'displayModeBar': False})
 
 with c_right:
     st.markdown('<div class="section-header">Historical Timeline Trajectory</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-caption">Select tracked phrases to isolate their performance over time.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">Select tracked key-phrases to isolate individual velocity streams over time.</div>', unsafe_allow_html=True)
     
     unique_phrases = sorted(hist_df["trend_phrase"].unique())
     selected_phrases = st.multiselect("Isolate Data Streams:", unique_phrases, default=unique_phrases[:2], label_visibility="collapsed")
@@ -148,12 +164,33 @@ with c_right:
             timeline_df, x="run_date", y="relevance_score", color="trend_phrase",
             color_discrete_sequence=["#014692", "#5593d8", "#002244", "#88bbee"]
         )
-        fig_line.update_traces(line=dict(width=3.5), marker=dict(size=6))
+        
+        # --- POWER BI STYLE CLEANUP CONFIGURATIONS ---
+        fig_line.update_traces(
+            line=dict(width=3.5, shape='linear'), # Thicker lines for an editorial dashboard look
+            marker=dict(size=7, line=dict(width=1, color='#ffffff'))
+        )
         fig_line.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(t=25, b=10, l=10, r=10), showlegend=True, legend_title=None,
-            xaxis=dict(showgrid=True, gridcolor="#eef1f5", title=None, tickfont=dict(color="black")),
-            yaxis=dict(showgrid=True, gridcolor="#eef1f5", title=None, tickfont=dict(color="black"))
+            plot_bgcolor="rgba(0,0,0,0)", 
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=30, b=40, l=40, r=40), 
+            showlegend=True, 
+            legend=dict(
+                orientation="h",       # Horizontally stack legend items
+                yanchor="bottom", y=1.02, # Position legend cleanly above the graph area
+                xanchor="right", x=1
+            ),
+            xaxis=dict(
+                showgrid=False, # Hiding vertical lines keeps timeline clean
+                title=None, 
+                tickfont=dict(size=10, family="Inter", color="#888888")
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                gridcolor="#f0f3f6", 
+                title=None, 
+                tickfont=dict(size=10, family="Inter", color="#888888")
+            )
         )
         st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
     else:
