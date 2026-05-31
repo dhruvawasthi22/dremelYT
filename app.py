@@ -15,7 +15,7 @@ st.markdown("""
         padding-bottom: 0rem !important;
         padding-left: 0rem !important;
         padding-right: 0rem !important;
-        margin-top: -3rem !important; /* Keep the ceiling pull */
+        margin-top: -2rem !important; /* Keep the ceiling pull */
         max-width: 100% !important;   /* Force edge-to-edge width */
     }
     </style>
