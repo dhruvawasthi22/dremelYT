@@ -33,9 +33,7 @@ SEARCH_TERMS = [
     "angle grinder projects", "oscillating multi tool uses", "rotary hammer drill uses",
     "DIY power tools trends", "construction power tool hacks", "woodworking power tools projects",
     "furniture flip", "thrift flip", "dresser makeover", "cabinet makeover",
-    "furniture restoration", "tool restoration", "restoration projects",
-    "restoration hacks", "carving project ideas"
-]
+    "furniture restoration", "tool restoration", "restoration projects", "carving project ideas"]
 
 DAYS_BACK = 90
 MAX_RESULTS_PER_QUERY = 25
