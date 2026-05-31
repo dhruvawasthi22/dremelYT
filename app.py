@@ -2,29 +2,38 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Set up a completely blank, wide canvas
-st.set_page_config(page_title="MakerTrends | Power Tool Intelligence", layout="wide")
+st.set_page_config(page_title="Dremel Trend Dashboard", layout="wide")
 
 # CSS to hide the default Streamlit borders and menus so Looker takes over the whole screen
 st.markdown("""
     <style>
-    /* Completely remove the header from the layout, don't just hide it */
-    header {display: none !important;}
-    [data-testid="stHeader"] {display: none !important;}
-    
-    /* Force the main container to push right up against the browser edge */
-    .block-container {
-        padding-top: 0rem !important; 
-        padding-bottom: 0rem !important; 
-        padding-left: 0rem !important; 
-        padding-right: 0rem !important; 
-        margin-top: 0rem !important;
-        max-width: 100% !important;
+    /* 1. Hide the top header entirely */
+    [data-testid="stHeader"] {
+        display: none !important;
     }
     
-    /* Strip away default iframe margins */
+    /* 2. Remove padding from the main app container */
+    [data-testid="stAppViewContainer"] {
+        padding: 0px !important;
+        margin: 0px !important;
+    }
+    
+    /* 3. Target the specific internal block where your code actually renders */
+    [data-testid="block-container"], 
+    [data-testid="stAppViewBlockContainer"] {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+        max-width: 100% !important;
+    }
+
+    /* 4. Strip away any default iframe margins or spacing */
     iframe {
-        display: block;
-        border: none;
+        display: block !important;
+        border: none !important;
+        margin: 0px !important;
+        padding: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
