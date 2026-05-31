@@ -9,10 +9,14 @@ st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none !important;}
     
-    /* Using the exact VIP selector you found online! */
+    /* The ultimate VIP selector for all four sides */
     div.block-container {
         padding-top: 0rem !important;
-        margin-top: -2rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+        margin-top: -3rem !important; /* Keep the ceiling pull */
+        max-width: 100% !important;   /* Force edge-to-edge width */
     }
     </style>
 """, unsafe_allow_html=True)
