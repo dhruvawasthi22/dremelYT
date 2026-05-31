@@ -15,8 +15,8 @@ API_KEY = os.getenv("YOUTUBE_API_KEY")
 GOOGLE_CREDS_JSON = os.getenv("GOOGLE_CREDS")
 
 # Target Google Sheet Name (Must match exactly what you named your file)
-SPREADSHEET_NAME = "MakerTrends_Database"
-
+#SPREADSHEET_NAME = "MakerTrends_Database"
+SPREADSHEET_ID = "1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68"
 # Authenticate both APIs
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
@@ -24,10 +24,7 @@ if not GOOGLE_CREDS_JSON:
     raise ValueError("CRITICAL: GOOGLE_CREDS secret environment variable is missing!")
 
 creds_dict = json.loads(GOOGLE_CREDS_JSON)
-google_scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.readonly"
-]
+google_scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 sheets_creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=google_scopes)
 sheets_service = build("sheets", "v4", credentials=sheets_creds)
 
@@ -124,14 +121,7 @@ def extract_trends(df, top_n=25):
     trend_df = pd.DataFrame(two_word_keywords, columns=["trend_phrase", "yake_score"]).sort_values("yake_score", ascending=True)
     return trend_df.head(top_n)
 
-def find_spreadsheet_id(name):
-    # Search for spreadsheet ID using drive API file listings
-    drive_service = build("drive", "v3", credentials=sheets_creds)
-    results = drive_service.files().list(q=f"name='{name}' and mimeType='application/vnd.google-apps.spreadsheet'", fields="files(id)").execute()
-    files = results.get("files", [])
-    if not files:
-        raise FileNotFoundError(f"Could not find a Google Sheet named '{name}' shared with this service account email.")
-    return files[0]["id"]
+
 
 def export_to_google_sheet(spreadsheet_id, range_name, df, mode="overwrite"):
     # Clear and overwrite or append raw dataframe matrix to targeted tabs
@@ -183,15 +173,13 @@ def main():
 
     # Push to Google Cloud Sheets
     try:
-        sheet_id = find_spreadsheet_id(SPREADSHEET_NAME)
-        
         # Save video snapshot to Sheet tab 'Latest_Videos' (overwrites daily)
         print("Syncing video inventory dataset...")
-        export_to_google_sheet(sheet_id, "Latest_Videos!A1", df, mode="overwrite")
+        export_to_google_sheet(SPREADSHEET_ID, "Latest_Videos!A1", df, mode="overwrite")
         
         # Append today's trending phrases into Sheet tab 'Trends_History'
         print("Syncing phrase trend history database...")
-        export_to_google_sheet(sheet_id, "Trends_History!A1", trends, mode="append")
+        export_to_google_sheet(SPREADSHEET_ID, "Trends_History!A1", trends, mode="append")
         
         print("Data streams cleanly synced with Google Sheets!")
     except Exception as e:
