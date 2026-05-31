@@ -20,4 +20,7 @@ st.markdown("""
 looker_url = "https://datastudio.google.com/embed/reporting/81450734-233d-4c12-b61c-17770e06360b/page/VxqzF"
 
 # Render the Looker Studio dashboard inside your Streamlit site
-components.iframe(looker_url, width=None, height=1200, scrolling=False)
+#components.iframe(looker_url, width=None, height=1200, scrolling=False)
+st.markdown(f"""
+    <iframe src="{looker_url}" width="100%" height="1200" style="border:none; padding:0; margin:0;"></iframe>
+""", unsafe_allow_html=True)
