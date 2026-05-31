@@ -24,7 +24,10 @@ if not GOOGLE_CREDS_JSON:
     raise ValueError("CRITICAL: GOOGLE_CREDS secret environment variable is missing!")
 
 creds_dict = json.loads(GOOGLE_CREDS_JSON)
-google_scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+google_scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.readonly"
+]
 sheets_creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=google_scopes)
 sheets_service = build("sheets", "v4", credentials=sheets_creds)
 
