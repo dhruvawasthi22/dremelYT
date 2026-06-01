@@ -42,7 +42,7 @@ looker_url = "https://datastudio.google.com/embed/reporting/81450734-233d-4c12-b
 
 # 5. THE CACHE BUSTER: Append the current time so the browser thinks it's a brand new link
 timestamp = int(time.time())
-cache_busting_url = f"{base_looker_url}?t={timestamp}"
+cache_busting_url = f"{looker_url}?t={timestamp}"
 
 # 6. Injecting the iframe
 st.markdown(f"""
