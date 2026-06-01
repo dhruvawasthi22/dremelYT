@@ -1,30 +1,50 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import time
 
-# Set up a completely blank, wide canvas
-st.set_page_config(page_title="Dremel Trend Dashboard", layout="wide")
+# 1. Setup the wide page
+st.set_page_config(page_title="MakerTrends | Power Tool Intelligence", layout="wide")
 
-# CSS to hide the default Streamlit borders and menus so Looker takes over the whole screen
+# 2. CSS to kill ALL padding, but leave just enough room at the top for our button
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none !important;}
     
-    /* The ultimate VIP selector for all four sides */
     div.block-container {
-        padding-top: 0rem !important;
+        padding-top: 1rem !important; /* Added 1rem so the button isn't cut off */
         padding-bottom: 0rem !important;
         padding-left: 0rem !important;
         padding-right: 0rem !important;
-        margin-top: -2rem !important; /* Keep the ceiling pull */
-        max-width: 100% !important;   /* Force edge-to-edge width */
+        margin-top: -3rem !important; 
+        max-width: 100% !important;   
+    }
+    
+    /* Style the Streamlit button to look corporate and clean */
+    div[data-testid="stButton"] button {
+        float: right;
+        margin-right: 20px;
+        background-color: #014692; /* Dremel Blue */
+        color: white;
+        border-radius: 4px;
+        border: none;
     }
     </style>
 """, unsafe_allow_html=True)
-# --- PASTE YOUR LOOKER STUDIO EMBED URL BELOW ---
-looker_url = "https://datastudio.google.com/embed/reporting/81450734-233d-4c12-b61c-17770e06360b/page/VxqzF"
 
-# Render the Looker Studio dashboard inside your Streamlit site
-#components.iframe(looker_url, width=None, height=1200, scrolling=False)
+# 3. Create the Refresh Button UI
+col1, col2 = st.columns([9, 1]) # Pushes the button to the far right
+with col2:
+    if st.button("🔄 Refresh Dashboard"):
+        # When clicked, Streamlit will just rapidly re-run this script
+        pass 
+
+# 4. Your Looker URL (Base)
+base_looker_url = "https://lookerstudio.google.com/embed/reporting/YOUR-UNIQUE-ID/page/YOUR-PAGE"
+
+# 5. THE CACHE BUSTER: Append the current time so the browser thinks it's a brand new link
+timestamp = int(time.time())
+cache_busting_url = f"{base_looker_url}?t={timestamp}"
+
+# 6. Injecting the iframe
 st.markdown(f"""
-    <iframe src="{looker_url}" width="100%" height="1200" style="border:none; padding:0; margin:0;"></iframe>
+    <iframe src="{cache_busting_url}" width="100%" height="1200" style="border:none; padding:0; margin:0;"></iframe>
 """, unsafe_allow_html=True)
