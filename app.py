@@ -38,7 +38,7 @@ with col2:
         pass 
 
 # 4. Your Looker URL (Base)
-base_looker_url = "https://lookerstudio.google.com/embed/reporting/YOUR-UNIQUE-ID/page/YOUR-PAGE"
+looker_url = "https://datastudio.google.com/embed/reporting/81450734-233d-4c12-b61c-17770e06360b/page/VxqzF"
 
 # 5. THE CACHE BUSTER: Append the current time so the browser thinks it's a brand new link
 timestamp = int(time.time())
