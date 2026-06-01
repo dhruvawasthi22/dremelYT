@@ -54,7 +54,7 @@ def load_live_data():
     Replace the URL below with the raw CSV link from your GitHub repo, 
     or your published Google Sheets CSV export link.
     """
-    data_url = "YOUR_GITHUB_OR_SHEETS_CSV_URL_HERE.csv"
+    data_url = "https://docs.google.com/spreadsheets/d/1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68/edit?usp=sharing"
     
     try:
         df = pd.read_csv(data_url)
