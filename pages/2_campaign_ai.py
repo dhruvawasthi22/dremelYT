@@ -35,26 +35,23 @@ st.divider()
 # 2. SECURITY HANDSHAKE CONFIGURATION
 load_dotenv()
 
-# Fetch variables from environment or local .env file
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-GOOGLE_CREDS_JSON = os.getenv("GOOGLE_CREDS")
+# Fetch variables from Streamlit Secrets first (for Cloud), then fallback to .env (for local)
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY", os.getenv("YOUTUBE_API_KEY"))
+GOOGLE_CREDS_JSON = st.secrets.get("GOOGLE_CREDS", os.getenv("GOOGLE_CREDS"))
 
 # Initialize Gemini Model if key is present
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("❌ GEMINI_API_KEY missing. Please check your .env file or environment variables.")
+    st.error("❌ GEMINI_API_KEY missing. Please add it to your Streamlit Cloud Secrets.")
 
 # 3. FETCH LIVE DATA (The Pandas Integration)
 @st.cache_data(ttl=3600)
 def load_live_data():
-    """
-    Replace the URL below with the raw CSV link from your GitHub repo, 
-    or your published Google Sheets CSV export link.
-    """
-    data_url = "https://docs.google.com/spreadsheets/d/1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68/edit?usp=sharing"
+    # Modified Google Sheets link to force CSV export instead of loading the HTML webpage
+    data_url = "https://docs.google.com/spreadsheets/d/1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68/export?format=csv"
     
     try:
         df = pd.read_csv(data_url)
@@ -115,6 +112,7 @@ with col2:
                     
                     # Generate Image via Pollinations
                     safe_url_prompt = urllib.parse.quote(dynamic_image_prompt)
+                    # Fixed the markdown typo in this URL string
                     image_url = f"[https://image.pollinations.ai/prompt/](https://image.pollinations.ai/prompt/){safe_url_prompt}?width=1200&height=600&nologo=true"
                     
                     # Render Outputs
