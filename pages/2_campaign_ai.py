@@ -50,30 +50,34 @@ best_channel = videos_df.sort_values(by="engagement_score", ascending=False).ilo
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_campaign(trend, channel):
     prompt = f"""
-    Act as Dremel CMO. Target audience: 24-44. Voice: resourceful and concise.
-    Create a highly condensed campaign blueprint for the trend: '{trend}', partnering with the channel: '{channel}'.
+    Act as Dremel CMO. Target audience: 24-44. Voice: professional, resourceful, and action-oriented.
+    Create a complete campaign blueprint for the trend: '{trend}', partnering with the channel: '{channel}'.
     
-    You must output exactly two sections separated by the delimiter '|||'. Do not include any other text.
+    You must output exactly two main components separated by the divider '|||'.
     
-    Section 1 (Strategy): Write short markdown bullet blocks covering: 1. SEO Keywords, 2. Email Copy, 3. Social Ads, 4. UGC Contest. Keep it under 120 words total.
+    Component 1: Complete the following four marketing points fully. Do not leave any point empty or incomplete.
+    1. SEO Keywords: List 4 relevant search terms.
+    2. Email Copy: Write a concise subject line and a 2-sentence promotional hook.
+    3. Social Ads: Provide a strong headline and primary text copy block.
+    4. UGC Contest: Outline a quick call-to-action campaign mechanic for users.
     
     |||
     
-    Section 2 (Image Prompt): Write a single-sentence photography style description for {trend}.
+    Component 2: Write a detailed, single-sentence photography style description to use as an AI image generation prompt for this trend.
     """
     
     try:
         response = model.generate_content(
             prompt, 
             generation_config=genai.GenerationConfig(
-                max_output_tokens=1000, 
+                max_output_tokens=1500, 
                 temperature=0.7
             )
         )
         
         raw_text = response.text.strip()
         
-        # Parse using the custom delimiter instead of JSON to eliminate syntax crashes
+        # Safe split handling to guarantee content display
         if "|||" in raw_text:
             strategy_part, image_part = raw_text.split("|||", 1)
             return {
@@ -83,7 +87,7 @@ def fetch_campaign(trend, channel):
         else:
             return {
                 "strategy": raw_text,
-                "image_prompt": ""
+                "image_prompt": f"Professional photography of {trend}, studio lighting, highly detailed."
             }
             
     except Exception as e:
