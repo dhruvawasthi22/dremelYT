@@ -43,7 +43,7 @@ GOOGLE_CREDS_JSON = st.secrets.get("GOOGLE_CREDS", os.getenv("GOOGLE_CREDS"))
 # Initialize Gemini Model if key is present
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-flash-latest')
 else:
     st.error("❌ GEMINI_API_KEY missing. Please add it to your Streamlit Cloud Secrets.")
 
