@@ -25,11 +25,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Navigation Back to Main Dashboard
-if st.button("⬅️ Back to Looker Studio", key="back_btn", help="Return to Main Dashboard"):
+if st.button("⬅️ Dashboard", key="back_btn", help="Return to Dashboard"):
     st.switch_page("app.py")
+logo_url = "dremel_icon.png"
 
-st.title("⚡ AI Campaign Architect")
-st.markdown("Instantly generate full-funnel marketing strategies based on your live GitHub/Sheets data pipeline.")
+# The width parameter keeps it from being massive
+st.image(logo_url, width=200)
+
+st.title("AI Campaign Architect")
+st.markdown("Generate full-funnel marketing strategies based on trends")
 st.divider()
 
 # 2. SECURITY HANDSHAKE CONFIGURATION
@@ -141,7 +145,7 @@ with col2:
         if not GEMINI_API_KEY:
             st.error("Cannot generate campaign: Gemini API key is missing.")
         else:
-            with st.spinner(f"🧠 Analyzing '{selected_trend}'... (This is instant if previously cached)"):
+            with st.spinner(f"🧠 Analyzing '{selected_trend}'..."):
                 
                 result = fetch_campaign_from_ai(selected_trend, selected_channel)
                 
