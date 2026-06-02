@@ -31,7 +31,6 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Updated to match your Gemini dashboard model
     model = genai.GenerativeModel('gemini-3.5-flash') 
 else:
     st.error("❌ API KEY MISSING.")
@@ -56,10 +55,17 @@ def fetch_campaign(trend, channel, want_image):
     prompt = f"Act as Dremel CMO. Trend: '{trend}'. Partner: '{channel}'. Max 100 words. Return JSON: {schema}"
     
     try:
-        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(max_output_tokens=300, temperature=0.7, response_mime_type="application/json"))
+        # Increased max_output_tokens to 1000 to prevent cutoff error
+        response = model.generate_content(
+            prompt, 
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=1000, 
+                temperature=0.7, 
+                response_mime_type="application/json"
+            )
+        )
         return json.loads(response.text)
     except Exception as e:
-        # Exposes the true underlying error to the UI
         st.error(f"🧬 Debug Info (Actual API Error): {e}")
         return None
 
