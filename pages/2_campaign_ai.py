@@ -48,28 +48,44 @@ else:
     st.error("❌ GEMINI_API_KEY missing. Please add it to your Streamlit Cloud Secrets.")
 
 # 3. FETCH LIVE DATA (The Pandas Integration)
+# 3. FETCH LIVE DATA (The Pandas Multi-Tab Integration)
 @st.cache_data(ttl=3600)
 def load_live_data():
-    # Modified Google Sheets link to force CSV export instead of loading the HTML webpage
-    data_url = "https://docs.google.com/spreadsheets/d/1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68/export?format=csv"
+    # Notice we changed "format=csv" to "format=xlsx" at the end of the URL
+    data_url = "https://docs.google.com/spreadsheets/d/1MtzB35dorD9YUHLlVzfratj27gcdmn2XTZLoVzCIl68/export?format=xlsx"
     
     try:
-        df = pd.read_csv(data_url)
-        return df
+        # sheet_name=None forces Pandas to load ALL tabs into a dictionary
+        sheets = pd.read_excel(data_url, sheet_name=None)
+        
+        # Extract the exact two tabs you named
+        videos_df = sheets['Latest_Videos']
+        trends_df = sheets['Trends_History']
+        
+        return videos_df, trends_df
+        
     except Exception as e:
-        st.warning("⚠️ Could not load live CSV. Using fallback data.")
-        return pd.DataFrame({
-            "trend_phrase": ["Furniture Makeover", "Resin Art", "PC Case Mod"],
-            "Trend Power": [12.5, 9.2, 8.4],
+        st.warning(f"⚠️ Could not load live data. Error: {e}")
+        # Fallback data matching your exact column names just in case
+        fallback_videos = pd.DataFrame({
             "channel": ["Project Farm", "Odd Builds", "Gabi Jones"],
             "engagement_score": [55000, 120000, 45000]
         })
+        fallback_trends = pd.DataFrame({
+            "trend_phrase": ["Furniture Makeover", "Resin Art", "PC Case Mod"],
+            "adjusted_yake_score": [12.5, 9.2, 8.4]
+        })
+        return fallback_videos, fallback_trends
 
-df = load_live_data()
+# Unpack the two separate dataframes
+videos_df, trends_df = load_live_data()
 
-# 4. CALCULATE THE #1 TREND AND #1 CHANNEL
-top_trends_list = df.sort_values(by="Trend Power", ascending=False)["trend_phrase"].unique().tolist()
-best_channel = df.sort_values(by="engagement_score", ascending=False).iloc[0]["channel"]
+# 4. CALCULATE THE #1 TREND AND #1 CHANNEL USING YOUR SCHEMA
+# Grabs the highest adjusted_yake_score from the Trends tab
+top_trends_list = trends_df.sort_values(by="adjusted_yake_score", ascending=False)["trend_phrase"].unique().tolist()
+
+# Grabs the highest engagement_score from the Videos tab
+best_channel = videos_df.sort_values(by="engagement_score", ascending=False).iloc[0]["channel"]
 
 # 5. THE USER INTERFACE
 col1, col2 = st.columns([1, 2], gap="large")
