@@ -5,7 +5,13 @@ import urllib.parse
 import json
 import time
 import os
+import typing
 from dotenv import load_dotenv
+
+# Define strict, un-crashable data structural expectations for the API
+class CampaignPlaybook(typing.TypedDict):
+    strategy: str
+    image_prompt: str
 
 # 1. SETUP
 st.set_page_config(page_title="Dremel | AI Campaign Architect", layout="wide", initial_sidebar_state="collapsed")
@@ -50,18 +56,26 @@ best_channel = videos_df.sort_values(by="engagement_score", ascending=False).ilo
 
 # 4. AI FUNCTION
 @st.cache_data(ttl=86400, show_spinner=False)
-def fetch_campaign(trend, channel, want_image):
-    schema = '{"strategy": "Bullets: 1. SEO 2. Email 3. Ads 4. UGC", "image_prompt": "Cinematic visual description"}' if want_image else '{"strategy": "Bullets: 1. SEO 2. Email 3. Ads 4. UGC"}'
-    prompt = f"Act as Dremel CMO. Trend: '{trend}'. Partner: '{channel}'. Max 100 words. Return JSON: {schema}"
+def fetch_campaign(trend, channel):
+    prompt = f"""
+    Act as Dremel CMO. Target audience: 24-44. Voice: resourceful and concise.
+    Create a highly condensed campaign blueprint for the trend: '{trend}', partnering with the channel: '{channel}'.
+    
+    Structure the 'strategy' field text using short markdown bullet blocks covering:
+    1. SEO Keywords, 2. Email Copy, 3. Social Ads, 4. UGC Contest. Keep it under 120 words total.
+    
+    For 'image_prompt', write a single-sentence photography style description for {trend}.
+    """
     
     try:
-        # Increased max_output_tokens to 1000 to prevent cutoff error
+        # Enforcing structured schemas to bypass string token formatting issues
         response = model.generate_content(
             prompt, 
-            generation_config=genai.types.GenerationConfig(
+            generation_config=genai.GenerationConfig(
                 max_output_tokens=1000, 
                 temperature=0.7, 
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=CampaignPlaybook # Hard constraint structure
             )
         )
         return json.loads(response.text)
@@ -81,8 +95,10 @@ with col1:
 with col2:
     if btn:
         with st.spinner("Analyzing..."):
-            res = fetch_campaign(trend, channel, want_image)
+            res = fetch_campaign(trend, channel)
             if res:
-                if want_image and "image_prompt" in res:
+                # Render the image container only if the checkbox is active
+                if want_image and "image_prompt" in res and res["image_prompt"]:
                     st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(res['image_prompt'])}?width=1200&height=600&nologo=true", use_container_width=True)
-                st.markdown(res.get("strategy", "Error"))
+                
+                st.markdown(res.get("strategy", "Error loading campaign text."))
