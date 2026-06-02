@@ -5,3 +5,4 @@ yake
 google-api-python-client
 python-dotenv
 google-generativeai
+openpyxl
