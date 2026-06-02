@@ -87,29 +87,33 @@ top_trends_list = trends_df.sort_values(by="adjusted_yake_score", ascending=Fals
 # Grabs the highest engagement_score from the Videos tab
 best_channel = videos_df.sort_values(by="engagement_score", ascending=False).iloc[0]["channel"]
 
+# --- NEW CACHED AI FUNCTION (Ultra-Lean Version) ---
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_campaign_from_ai(target_trend, target_channel):
     import time
     import json
     
+    # Ultra-condensed prompt demanding strict word limits and bullet points
     optimized_prompt = f"""
     Act as Dremel CMO. Target: 24-44. Voice: resourceful. 
-    Create a concise campaign for trend: '{target_trend}', partner: '{target_channel}'.
-    Return ONLY valid JSON format:
+    Create an ULTRA-SHORT campaign for trend: '{target_trend}', partner: '{target_channel}'.
+    Return ONLY valid JSON format. You MUST keep the strategy under 150 words using quick bullet points.
     {{
-        "strategy": "Markdown text. Bold headings: 1. SEO 2. Email 3. Ad Copy 4. UGC 5. CTA.",
-        "image_prompt": "Cinematic 4k Stable Diffusion prompt for {target_trend} using Dremel."
+        "strategy": "Markdown text. Max 2 bullets per section: 1. SEO 2. Email 3. Ads 4. UGC 5. CTA.",
+        "image_prompt": "A single-sentence cinematic visual description for {target_trend}."
     }}
     """
     
+    # Lowered the token ceiling from 800 to 300 (roughly 220 words max)
     safety_config = genai.types.GenerationConfig(
-        max_output_tokens=800,
+        max_output_tokens=300,
         temperature=0.7
     )
     
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            # Passing the lowered safety config
             response = model.generate_content(optimized_prompt, generation_config=safety_config)
             clean_json = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
@@ -120,7 +124,6 @@ def fetch_campaign_from_ai(target_trend, target_channel):
                     time.sleep(5)
                     continue
             return None
-
 # 5. THE USER INTERFACE
 col1, col2 = st.columns([1, 2], gap="large")
 
