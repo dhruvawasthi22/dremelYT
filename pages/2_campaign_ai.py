@@ -2,16 +2,8 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import urllib.parse
-import json
-import time
 import os
-import typing
 from dotenv import load_dotenv
-
-# Define strict, un-crashable data structural expectations for the API
-class CampaignPlaybook(typing.TypedDict):
-    strategy: str
-    image_prompt: str
 
 # 1. SETUP
 st.set_page_config(page_title="Dremel | AI Campaign Architect", layout="wide", initial_sidebar_state="collapsed")
@@ -61,24 +53,39 @@ def fetch_campaign(trend, channel):
     Act as Dremel CMO. Target audience: 24-44. Voice: resourceful and concise.
     Create a highly condensed campaign blueprint for the trend: '{trend}', partnering with the channel: '{channel}'.
     
-    Structure the 'strategy' field text using short markdown bullet blocks covering:
-    1. SEO Keywords, 2. Email Copy, 3. Social Ads, 4. UGC Contest. Keep it under 120 words total.
+    You must output exactly two sections separated by the delimiter '|||'. Do not include any other text.
     
-    For 'image_prompt', write a single-sentence photography style description for {trend}.
+    Section 1 (Strategy): Write short markdown bullet blocks covering: 1. SEO Keywords, 2. Email Copy, 3. Social Ads, 4. UGC Contest. Keep it under 120 words total.
+    
+    |||
+    
+    Section 2 (Image Prompt): Write a single-sentence photography style description for {trend}.
     """
     
     try:
-        # Enforcing structured schemas to bypass string token formatting issues
         response = model.generate_content(
             prompt, 
             generation_config=genai.GenerationConfig(
                 max_output_tokens=1000, 
-                temperature=0.7, 
-                response_mime_type="application/json",
-                response_schema=CampaignPlaybook # Hard constraint structure
+                temperature=0.7
             )
         )
-        return json.loads(response.text)
+        
+        raw_text = response.text.strip()
+        
+        # Parse using the custom delimiter instead of JSON to eliminate syntax crashes
+        if "|||" in raw_text:
+            strategy_part, image_part = raw_text.split("|||", 1)
+            return {
+                "strategy": strategy_part.strip(),
+                "image_prompt": image_part.strip()
+            }
+        else:
+            return {
+                "strategy": raw_text,
+                "image_prompt": ""
+            }
+            
     except Exception as e:
         st.error(f"🧬 Debug Info (Actual API Error): {e}")
         return None
@@ -97,8 +104,9 @@ with col2:
         with st.spinner("Analyzing..."):
             res = fetch_campaign(trend, channel)
             if res:
-                # Render the image container only if the checkbox is active
-                if want_image and "image_prompt" in res and res["image_prompt"]:
-                    st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(res['image_prompt'])}?width=1200&height=600&nologo=true", use_container_width=True)
+                # Render image if toggle is active and image prompt exists
+                if want_image and res.get("image_prompt"):
+                    clean_prompt = urllib.parse.quote(res["image_prompt"])
+                    st.image(f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1200&height=600&nologo=true", use_container_width=True)
                 
                 st.markdown(res.get("strategy", "Error loading campaign text."))
