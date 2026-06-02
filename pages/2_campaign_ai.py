@@ -87,6 +87,40 @@ top_trends_list = trends_df.sort_values(by="adjusted_yake_score", ascending=Fals
 # Grabs the highest engagement_score from the Videos tab
 best_channel = videos_df.sort_values(by="engagement_score", ascending=False).iloc[0]["channel"]
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_campaign_from_ai(target_trend, target_channel):
+    import time
+    import json
+    
+    optimized_prompt = f"""
+    Act as Dremel CMO. Target: 24-44. Voice: resourceful. 
+    Create a concise campaign for trend: '{target_trend}', partner: '{target_channel}'.
+    Return ONLY valid JSON format:
+    {{
+        "strategy": "Markdown text. Bold headings: 1. SEO 2. Email 3. Ad Copy 4. UGC 5. CTA.",
+        "image_prompt": "Cinematic 4k Stable Diffusion prompt for {target_trend} using Dremel."
+    }}
+    """
+    
+    safety_config = genai.types.GenerationConfig(
+        max_output_tokens=800,
+        temperature=0.7
+    )
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(optimized_prompt, generation_config=safety_config)
+            clean_json = response.text.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_json)
+            
+        except Exception as e:
+            if "429" in str(e) or "Quota" in str(e):
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                    continue
+            return None
+
 # 5. THE USER INTERFACE
 col1, col2 = st.columns([1, 2], gap="large")
 
@@ -104,36 +138,19 @@ with col2:
         if not GEMINI_API_KEY:
             st.error("Cannot generate campaign: Gemini API key is missing.")
         else:
-            with st.spinner("🧠 Gemini AI is analyzing the data and drafting the playbook..."):
-                prompt = f"""
-                Act as the Chief Marketing Officer for Dremel. Target audience: ages 24-44. 
-                Brand Voice: cool, creative, resourceful, value-driven.
+            with st.spinner(f"🧠 Analyzing '{selected_trend}'... (This is instant if previously cached)"):
                 
-                Task: Create a marketing campaign for the trend: '{selected_trend}', partnering with the YouTube channel '{selected_channel}'.
+                result = fetch_campaign_from_ai(selected_trend, selected_channel)
                 
-                You MUST return a valid JSON object with exactly two keys. Do not include markdown code blocks (like ```json), just the raw JSON:
-                {{
-                    "strategy": "A markdown-formatted string containing the full campaign. Include bold headings for: 1. SEO Keywords & Blog Title, 2. A 3-part Email Marketing drip, 3. Social Media Ad copy, 4. A User Generated Content (UGC) contest, and 5. Call to Action.",
-                    "image_prompt": "A highly detailed, comma-separated visual description for an AI image generator to create cinematic concept art for this specific campaign. Do not use text in the image. Focus on lighting, the Dremel tool, and the demographic doing the {selected_trend}."
-                }}
-                """
-                
-                try:
-                    response = model.generate_content(prompt)
-                    clean_json = response.text.replace("```json", "").replace("```", "").strip()
-                    result = json.loads(clean_json)
-                    
+                if result is None:
+                    st.error("❌ Google AI Quota Exceeded. The API is too busy. Please try again in a few seconds.")
+                else:
                     strategy_text = result.get("strategy", "Strategy generation failed.")
-                    dynamic_image_prompt = result.get("image_prompt", f"A cool cinematic product photography shot of {selected_trend} using a Dremel")
+                    dynamic_image_prompt = result.get("image_prompt", f"Cinematic product photography of {selected_trend}")
                     
-                    # Generate Image via Pollinations
+                    import urllib.parse
                     safe_url_prompt = urllib.parse.quote(dynamic_image_prompt)
-                    # Fixed the markdown typo in this URL string
-                    image_url = f"[https://image.pollinations.ai/prompt/](https://image.pollinations.ai/prompt/){safe_url_prompt}?width=1200&height=600&nologo=true"
+                    image_url = f"https://image.pollinations.ai/prompt/{safe_url_prompt}?width=1200&height=600&nologo=true"
                     
-                    # Render Outputs
-                    st.image(image_url, caption=f"AI Generated Concept Art: {dynamic_image_prompt}", use_container_width=True)
+                    st.image(image_url, caption=f"AI Concept Art: {dynamic_image_prompt}", use_container_width=True)
                     st.markdown(strategy_text)
-                    
-                except Exception as e:
-                    st.error(f"Failed to generate campaign. Error: {e}")
