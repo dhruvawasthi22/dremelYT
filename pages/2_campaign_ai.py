@@ -79,7 +79,11 @@ def fetch_campaign(trend, channel):
         else:
             return {"strategy": raw_text, "image_prompt": f"Professional product photography representing the trend: {trend}"}
     except Exception as e:
-        st.error(f"🧬 Gemini Error: {e}")
+        error_msg = str(e)
+        if "429" in error_msg or "quota" in error_msg.lower():
+            st.error("⏳ **Gemini Speed Limit Reached (5 requests/min).** Please wait 30 seconds before clicking generate again.")
+        else:
+            st.error(f"🧬 Gemini Error: {e}")
         return None
 
 def fetch_huggingface_image(prompt_text):
@@ -108,12 +112,15 @@ with col2:
             res = fetch_campaign(trend, channel)
             
             if res:
+                # Displays the strategy text markdown immediately
+                st.markdown(res.get("strategy", "Error loading campaign text."))
+                
+                # Triggers the image generation below the text output
                 if want_image and HF_TOKEN and res.get("image_prompt"):
+                    st.divider()
                     with st.spinner("⏳ Painting Concept Art via Stable Diffusion... (This takes about 15 seconds)"):
                         try:
                             image_bytes = fetch_huggingface_image(res["image_prompt"])
                             st.image(image_bytes, use_container_width=True, caption=f"AI Concept Art: {res['image_prompt']}")
                         except Exception as e:
                             st.error(f"Image Generation Failed: {e}")
-                
-                st.markdown(res.get("strategy", "Error loading campaign text."))
