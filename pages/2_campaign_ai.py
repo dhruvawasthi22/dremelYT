@@ -4,6 +4,7 @@ import google.generativeai as genai
 import requests
 import os
 from dotenv import load_dotenv
+import time
 
 # 1. SETUP
 st.set_page_config(page_title="Dremel | AI Campaign Architect", layout="wide", initial_sidebar_state="collapsed")
@@ -94,17 +95,35 @@ def fetch_campaign(trend, channel):
             st.error(f"🧬 Gemini Error: {e}")
         return None
 
+
+
 def fetch_huggingface_image(prompt_text):
     api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt_text}
-    # Increased timeout slightly to account for slow cloud networks
-    response = requests.post(api_url, headers=headers, json=payload, timeout=90)
     
-    if response.status_code == 200:
-        return response.content
-    else:
-        raise Exception(f"API Error {response.status_code}: {response.text}")
+    # We will try up to 3 times in case the model is waking up
+    for attempt in range(3):
+        response = requests.post(api_url, headers=headers, json=payload, timeout=90)
+        
+        if response.status_code == 200:
+            return response.content
+            
+        elif response.status_code == 503:
+            # The model is sleeping. Get the estimated wait time, or default to 15 seconds.
+            error_data = response.json()
+            wait_time = error_data.get("estimated_time", 15.0)
+            
+            st.info(f"☕ Hugging Face model is waking up. Waiting {round(wait_time)} seconds to try again...")
+            time.sleep(wait_time) # Pause the code for the required time
+            continue # Loop back up and try again
+            
+        else:
+            # If it's a different error (like a bad API key), crash and show the error
+            raise Exception(f"API Error {response.status_code}: {response.text}")
+            
+    # If it fails 3 times, give up
+    raise Exception("The image server took too long to wake up. Please try again later.")
 
 # 5. UI - TWO STEP PROCESS
 col1, col2 = st.columns([1, 2], gap="large")
