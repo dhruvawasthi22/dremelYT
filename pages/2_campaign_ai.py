@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import urllib.parse
-import os
 import requests
+import os
 from dotenv import load_dotenv
 
 # 1. SETUP
@@ -27,12 +26,16 @@ st.divider()
 # 2. API CONFIG
 load_dotenv()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-3.5-flash') 
 else:
-    st.error("❌ API KEY MISSING.")
+    st.error("❌ GEMINI API KEY MISSING.")
+
+if not HF_TOKEN:
+    st.warning("⚠️ HF_TOKEN missing in Streamlit Secrets. Image generation is disabled.")
 
 # 3. DATA
 @st.cache_data(ttl=3600)
@@ -47,7 +50,7 @@ videos_df, trends_df = load_live_data()
 top_trends_list = trends_df.sort_values(by="adjusted_yake_score", ascending=False)["trend_phrase"].unique().tolist()
 best_channel = videos_df.sort_values(by="engagement_score", ascending=False).iloc[0]["channel"]
 
-# 4. AI FUNCTION
+# 4. AI FUNCTIONS
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_campaign(trend, channel):
     prompt = f"""
@@ -66,34 +69,29 @@ def fetch_campaign(trend, channel):
     
     Component 2: Write a detailed, single-sentence photography style description to use as an AI image generation prompt for this trend.
     """
-    
     try:
-        response = model.generate_content(
-            prompt, 
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=1500, 
-                temperature=0.7
-            )
-        )
-        
+        response = model.generate_content(prompt, generation_config=genai.GenerationConfig(max_output_tokens=1500, temperature=0.7))
         raw_text = response.text.strip()
         
-        # Safe split handling to guarantee content display
         if "|||" in raw_text:
             strategy_part, image_part = raw_text.split("|||", 1)
-            return {
-                "strategy": strategy_part.strip(),
-                "image_prompt": image_part.strip()
-            }
+            return {"strategy": strategy_part.strip(), "image_prompt": image_part.strip()}
         else:
-            return {
-                "strategy": raw_text,
-                "image_prompt": f"Professional photography of {trend}, studio lighting, highly detailed."
-            }
-            
+            return {"strategy": raw_text, "image_prompt": f"Professional product photography representing the trend: {trend}"}
     except Exception as e:
-        st.error(f"🧬 Debug Info (Actual API Error): {e}")
+        st.error(f"🧬 Gemini Error: {e}")
         return None
+
+def fetch_huggingface_image(prompt_text):
+    api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    payload = {"inputs": prompt_text}
+    response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+    
+    if response.status_code == 200:
+        return response.content
+    else:
+        raise Exception(f"API Error {response.status_code}: {response.text}")
 
 # 5. UI
 col1, col2 = st.columns([1, 2], gap="large")
@@ -106,22 +104,16 @@ with col1:
 
 with col2:
     if btn:
-        with st.spinner("Analyzing..."):
+        with st.spinner("🧠 Strategizing with Gemini..."):
             res = fetch_campaign(trend, channel)
+            
             if res:
-                if want_image and res.get("image_prompt"):
-                    
-                    # 1. Format the AI Prompt URL
-                    clean_ai_prompt = urllib.parse.quote(res["image_prompt"])
-                    ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
-                    
-                    # 2. THE BYPASS: Force the user's browser to load the image via HTML
-                    st.markdown(f"""
-                        <div style="text-align: center; margin-bottom: 20px;">
-                            <img src="{ai_url}" alt="AI Concept Art" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <p style="color: gray; font-size: 0.9em; margin-top: 10px;">🎨 <b>AI Concept Art:</b> {res['image_prompt']}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
+                if want_image and HF_TOKEN and res.get("image_prompt"):
+                    with st.spinner("⏳ Painting Concept Art via Stable Diffusion... (This takes about 15 seconds)"):
+                        try:
+                            image_bytes = fetch_huggingface_image(res["image_prompt"])
+                            st.image(image_bytes, use_container_width=True, caption=f"AI Concept Art: {res['image_prompt']}")
+                        except Exception as e:
+                            st.error(f"Image Generation Failed: {e}")
                 
-                # Render the strategy text
                 st.markdown(res.get("strategy", "Error loading campaign text."))
