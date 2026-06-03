@@ -98,7 +98,8 @@ def fetch_huggingface_image(prompt_text):
     api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt_text}
-    response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+    # Increased timeout slightly to account for slow cloud networks
+    response = requests.post(api_url, headers=headers, json=payload, timeout=90)
     
     if response.status_code == 200:
         return response.content
@@ -137,7 +138,6 @@ with col2:
             
             # If we haven't generated it yet, show the button
             else:
-                st.info(f"📸 **Ready to visualize:** {st.session_state['current_prompt']}")
                 if st.button("🎨 Paint Concept Art", use_container_width=True):
                     with st.spinner("⏳ Waking up Stable Diffusion... (This takes about 30-45 seconds)"):
                         try:
@@ -145,5 +145,7 @@ with col2:
                             image_bytes = fetch_huggingface_image(st.session_state['current_prompt'])
                             st.session_state['current_image'] = image_bytes
                             st.rerun() # Refresh the page to show the image instantly
+                        except requests.exceptions.ConnectionError:
+                            st.error("⚠️ Streamlit Cloud momentarily lost its internet connection. Please click the button to try again.")
                         except Exception as e:
                             st.error(f"Image Generation Failed: {e}")
