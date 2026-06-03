@@ -95,6 +95,7 @@ def fetch_campaign(trend, channel):
         return None
 
 # 5. UI
+# 5. UI
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -110,7 +111,18 @@ with col2:
             if res:
                 # Render image if toggle is active and image prompt exists
                 if want_image and res.get("image_prompt"):
+                    
+                    # --- NEW DIAGNOSTIC CODE ---
+                    st.info(f"🔍 **DEBUG - Raw Image Prompt:** {res['image_prompt']}")
+                    
                     clean_prompt = urllib.parse.quote(res["image_prompt"])
-                    st.image(f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1200&height=600&nologo=true", use_container_width=True)
+                    image_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1200&height=600&nologo=true"
+                    
+                    st.caption(f"Attempting to load image from: [Link]({image_url})")
+                    
+                    try:
+                        st.image(image_url, use_container_width=True)
+                    except Exception as e:
+                        st.warning("⚠️ The image generator took too long to respond. Try clicking generate again.")
                 
                 st.markdown(res.get("strategy", "Error loading campaign text."))
