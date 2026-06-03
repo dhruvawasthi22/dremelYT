@@ -97,30 +97,52 @@ def fetch_huggingface_image(prompt_text):
     else:
         raise Exception(f"API Error {response.status_code}: {response.text}")
 
-# 5. UI
+# 5. UI - OPTIMIZED WITH SESSION STATE
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
     trend = st.selectbox("Trend", top_trends_list, index=0)
     channel = st.text_input("Partner", value=best_channel, disabled=True)
-    want_image = st.toggle("Generate Concept Art", value=True)
-    btn = st.button("🚀 Generate Campaign", type="primary", use_container_width=True)
+    
+    # Notice we removed the toggle switch. It is replaced by a dedicated button below.
+    btn = st.button("🚀 Generate Campaign Strategy", type="primary", use_container_width=True)
 
 with col2:
+    # 1. FETCH TEXT AND SAVE TO MEMORY
     if btn:
-        with st.spinner("🧠 Strategizing with Gemini..."):
+        with st.spinner("🧠 Strategizing with Gemini... (Takes 2 seconds)"):
             res = fetch_campaign(trend, channel)
-            
             if res:
-                # Displays the strategy text markdown immediately
-                st.markdown(res.get("strategy", "Error loading campaign text."))
-                
-                # Triggers the image generation below the text output
-                if want_image and HF_TOKEN and res.get("image_prompt"):
-                    st.divider()
-                    with st.spinner("⏳ Painting Concept Art via Stable Diffusion... (This takes about 15 seconds)"):
-                        try:
-                            image_bytes = fetch_huggingface_image(res["image_prompt"])
-                            st.image(image_bytes, use_container_width=True, caption=f"AI Concept Art: {res['image_prompt']}")
-                        except Exception as e:
-                            st.error(f"Image Generation Failed: {e}")
+                # Save the campaign to Streamlit's temporary memory
+                st.session_state['current_campaign'] = res
+                st.session_state['current_image'] = None # Clear any old image
+
+    # 2. DISPLAY SAVED TEXT INSTANTLY
+    if 'current_campaign' in st.session_state and st.session_state['current_campaign']:
+        campaign = st.session_state['current_campaign']
+        
+        # This renders instantly, no waiting!
+        st.markdown(campaign.get("strategy", "Error loading campaign text."))
+        
+        st.divider()
+        
+        # 3. HANDLE THE HEAVY IMAGE GENERATION
+        # If we already generated the image for this campaign, keep showing it
+        if st.session_state.get('current_image'):
+            st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 AI Concept Art: {campaign['image_prompt']}")
+            
+        # If we haven't generated it yet, show the prompt and the opt-in button
+        elif HF_TOKEN and campaign.get("image_prompt"):
+            st.info(f"📸 **Image Prompt ready:** {campaign['image_prompt']}")
+            
+            img_btn = st.button("🎨 Paint Concept Art (Takes 30-45 seconds)")
+            
+            if img_btn:
+                with st.spinner("⏳ Waking up Stable Diffusion on Hugging Face... Please wait."):
+                    try:
+                        image_bytes = fetch_huggingface_image(campaign["image_prompt"])
+                        # Save the image to memory so it doesn't disappear
+                        st.session_state['current_image'] = image_bytes
+                        st.image(image_bytes, use_container_width=True, caption=f"🎨 AI Concept Art: {campaign['image_prompt']}")
+                    except Exception as e:
+                        st.error(f"Image Generation Failed: {e}")
