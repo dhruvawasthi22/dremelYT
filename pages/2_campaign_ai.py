@@ -23,6 +23,14 @@ except: pass
 st.title("AI Campaign Architect")
 st.divider()
 
+# --- INITIALIZE MEMORY STATE ---
+if 'current_strategy' not in st.session_state:
+    st.session_state['current_strategy'] = None
+if 'current_prompt' not in st.session_state:
+    st.session_state['current_prompt'] = None
+if 'current_image' not in st.session_state:
+    st.session_state['current_image'] = None
+
 # 2. API CONFIG
 load_dotenv()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
@@ -97,52 +105,45 @@ def fetch_huggingface_image(prompt_text):
     else:
         raise Exception(f"API Error {response.status_code}: {response.text}")
 
-# 5. UI - OPTIMIZED WITH SESSION STATE
+# 5. UI - TWO STEP PROCESS
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
     trend = st.selectbox("Trend", top_trends_list, index=0)
     channel = st.text_input("Partner", value=best_channel, disabled=True)
     
-    # Notice we removed the toggle switch. It is replaced by a dedicated button below.
-    btn = st.button("🚀 Generate Campaign Strategy", type="primary", use_container_width=True)
-
-with col2:
-    # 1. FETCH TEXT AND SAVE TO MEMORY
-    if btn:
-        with st.spinner("🧠 Strategizing with Gemini... (Takes 2 seconds)"):
+    # STEP 1: Fetch Text Only
+    if st.button("🚀 Generate Campaign Strategy", type="primary", use_container_width=True):
+        with st.spinner("🧠 Strategizing with Gemini... (Takes ~2 seconds)"):
             res = fetch_campaign(trend, channel)
             if res:
-                # Save the campaign to Streamlit's temporary memory
-                st.session_state['current_campaign'] = res
-                st.session_state['current_image'] = None # Clear any old image
+                # Save to memory so it doesn't disappear
+                st.session_state['current_strategy'] = res.get("strategy")
+                st.session_state['current_prompt'] = res.get("image_prompt")
+                st.session_state['current_image'] = None # Clear old image
 
-    # 2. DISPLAY SAVED TEXT INSTANTLY
-    if 'current_campaign' in st.session_state and st.session_state['current_campaign']:
-        campaign = st.session_state['current_campaign']
-        
-        # This renders instantly, no waiting!
-        st.markdown(campaign.get("strategy", "Error loading campaign text."))
-        
+with col2:
+    # Display the strategy immediately if it exists in memory
+    if st.session_state['current_strategy']:
+        st.markdown(st.session_state['current_strategy'])
         st.divider()
         
-        # 3. HANDLE THE HEAVY IMAGE GENERATION
-        # If we already generated the image for this campaign, keep showing it
-        if st.session_state.get('current_image'):
-            st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 AI Concept Art: {campaign['image_prompt']}")
+        # STEP 2: The Opt-In Image Button
+        if HF_TOKEN and st.session_state['current_prompt']:
             
-        # If we haven't generated it yet, show the prompt and the opt-in button
-        elif HF_TOKEN and campaign.get("image_prompt"):
-            st.info(f"📸 **Image Prompt ready:** {campaign['image_prompt']}")
+            # If we already generated the image, just show it
+            if st.session_state['current_image']:
+                st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 AI Concept Art: {st.session_state['current_prompt']}")
             
-            img_btn = st.button("🎨 Paint Concept Art (Takes 30-45 seconds)")
-            
-            if img_btn:
-                with st.spinner("⏳ Waking up Stable Diffusion on Hugging Face... Please wait."):
-                    try:
-                        image_bytes = fetch_huggingface_image(campaign["image_prompt"])
-                        # Save the image to memory so it doesn't disappear
-                        st.session_state['current_image'] = image_bytes
-                        st.image(image_bytes, use_container_width=True, caption=f"🎨 AI Concept Art: {campaign['image_prompt']}")
-                    except Exception as e:
-                        st.error(f"Image Generation Failed: {e}")
+            # If we haven't generated it yet, show the button
+            else:
+                st.info(f"📸 **Ready to visualize:** {st.session_state['current_prompt']}")
+                if st.button("🎨 Paint Concept Art", use_container_width=True):
+                    with st.spinner("⏳ Waking up Stable Diffusion... (This takes about 30-45 seconds)"):
+                        try:
+                            # Fetch and save to memory
+                            image_bytes = fetch_huggingface_image(st.session_state['current_prompt'])
+                            st.session_state['current_image'] = image_bytes
+                            st.rerun() # Refresh the page to show the image instantly
+                        except Exception as e:
+                            st.error(f"Image Generation Failed: {e}")
