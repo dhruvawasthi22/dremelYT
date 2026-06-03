@@ -109,30 +109,19 @@ with col2:
         with st.spinner("Analyzing..."):
             res = fetch_campaign(trend, channel)
             if res:
-                # Render image if toggle is active
                 if want_image and res.get("image_prompt"):
                     
-                    # 1. Prepare both URLs
+                    # 1. Format the AI Prompt URL
                     clean_ai_prompt = urllib.parse.quote(res["image_prompt"])
-                    clean_trend = urllib.parse.quote(trend)
-                    
                     ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
-                    fallback_url = f"https://loremflickr.com/1200/600/{clean_trend},tools"
                     
-                    try:
-                        # 2. Ping Pollinations secretly first (timeout after 5 seconds so it doesn't freeze)
-                        img_response = requests.get(ai_url, timeout=5)
-                        
-                        # 3. Check if Pollinations gave us an image file, OR if it gave us an error/JSON text
-                        if img_response.status_code == 200 and 'image' in img_response.headers.get('Content-Type', ''):
-                            # It's a real AI image! Show it.
-                            st.image(img_response.content, use_container_width=True, caption=f"🎨 AI Concept Art: {res['image_prompt']}")
-                        else:
-                            # It got blocked and returned JSON. Swap to fallback immediately.
-                            st.image(fallback_url, use_container_width=True, caption=f"📷 Stock Image Representation: {trend}")
-                            
-                    except Exception:
-                        # If the server timed out completely, also trigger the fallback
-                        st.image(fallback_url, use_container_width=True, caption=f"📷 Stock Image Representation: {trend}")
+                    # 2. THE BYPASS: Force the user's browser to load the image via HTML
+                    st.markdown(f"""
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <img src="{ai_url}" alt="AI Concept Art" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <p style="color: gray; font-size: 0.9em; margin-top: 10px;">🎨 <b>AI Concept Art:</b> {res['image_prompt']}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
                 
+                # Render the strategy text
                 st.markdown(res.get("strategy", "Error loading campaign text."))
