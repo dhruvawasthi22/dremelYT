@@ -3,6 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 import os
+import requests
 from dotenv import load_dotenv
 
 # 1. SETUP
@@ -95,7 +96,6 @@ def fetch_campaign(trend, channel):
         return None
 
 # 5. UI
-# 5. UI
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -109,20 +109,30 @@ with col2:
         with st.spinner("Analyzing..."):
             res = fetch_campaign(trend, channel)
             if res:
-                # Render image if toggle is active and image prompt exists
+                # Render image if toggle is active
                 if want_image and res.get("image_prompt"):
                     
-                    # --- NEW DIAGNOSTIC CODE ---
-                    st.info(f"🔍 **DEBUG - Raw Image Prompt:** {res['image_prompt']}")
+                    # 1. Prepare both URLs
+                    clean_ai_prompt = urllib.parse.quote(res["image_prompt"])
+                    clean_trend = urllib.parse.quote(trend)
                     
-                    clean_prompt = urllib.parse.quote(res["image_prompt"])
-                    image_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1200&height=600&nologo=true"
-                    
-                    st.caption(f"Attempting to load image from: [Link]({image_url})")
+                    ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
+                    fallback_url = f"https://loremflickr.com/1200/600/{clean_trend},tools"
                     
                     try:
-                        st.image(image_url, use_container_width=True)
-                    except Exception as e:
-                        st.warning("⚠️ The image generator took too long to respond. Try clicking generate again.")
+                        # 2. Ping Pollinations secretly first (timeout after 5 seconds so it doesn't freeze)
+                        img_response = requests.get(ai_url, timeout=5)
+                        
+                        # 3. Check if Pollinations gave us an image file, OR if it gave us an error/JSON text
+                        if img_response.status_code == 200 and 'image' in img_response.headers.get('Content-Type', ''):
+                            # It's a real AI image! Show it.
+                            st.image(img_response.content, use_container_width=True, caption=f"🎨 AI Concept Art: {res['image_prompt']}")
+                        else:
+                            # It got blocked and returned JSON. Swap to fallback immediately.
+                            st.image(fallback_url, use_container_width=True, caption=f"📷 Stock Image Representation: {trend}")
+                            
+                    except Exception:
+                        # If the server timed out completely, also trigger the fallback
+                        st.image(fallback_url, use_container_width=True, caption=f"📷 Stock Image Representation: {trend}")
                 
                 st.markdown(res.get("strategy", "Error loading campaign text."))
