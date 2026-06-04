@@ -126,12 +126,21 @@ with col2:
                 
                 js_code = f"""
                 <div id="wrapper" style="text-align: center; font-family: sans-serif; color: white;">
-                    <p id="loader" style="background: #333; padding: 10px; border-radius: 5px;">⏳ Painting Concept Art... Please wait.</p>
-                    <img id="display-img" src="{ai_url}" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+                    <p id="loader" style="background: #333; padding: 10px; border-radius: 5px;">⏳ Fetching Image... Please wait up to 15 seconds.</p>
+                    <img id="display-img" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+                    
+                    <div id="error-box" style="display: none; background: #333; border: 1px solid #ff4444; padding: 20px; border-radius: 8px; text-align: left;">
+                        <h3 style="color: #ff4444; margin-top: 0;">⚠️ Browser Blocked The Image</h3>
+                        <p style="color: #ddd;">Your browser's <b>Adblocker</b>, <b>VPN</b>, or <b>Corporate Firewall</b> physically prevented the free images from loading.</p>
+                        <p style="color: #aaa; font-size: 0.9em; margin-bottom: 0;"><i>(We tried to load the AI Image, and then the Stock Photo. Both were blocked by your computer before they could finish.)</i></p>
+                    </div>
                 </div>
                 <script>
                     const img = document.getElementById("display-img");
                     const loader = document.getElementById("loader");
+                    const errorBox = document.getElementById("error-box");
+                    
+                    let attempts = 0;
                     
                     img.onload = function() {{
                         loader.style.display = "none";
@@ -139,8 +148,19 @@ with col2:
                     }};
                     
                     img.onerror = function() {{
-                        img.src = "{fallback_url}";
+                        attempts++;
+                        if (attempts === 1) {{
+                            // First failure: AI Image blocked. Try stock photo.
+                            img.src = "{fallback_url}";
+                        }} else if (attempts === 2) {{
+                            // Second failure: Stock photo ALSO blocked. Kill loop and show error.
+                            loader.style.display = "none";
+                            errorBox.style.display = "block";
+                        }}
                     }};
+                    
+                    // Start the process
+                    img.src = "{ai_url}";
                 </script>
                 """
                 components.html(js_code, height=650)
