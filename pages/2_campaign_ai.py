@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import google.generativeai as genai
 import urllib.parse
@@ -91,7 +90,7 @@ def fetch_campaign(trend, channel):
             st.error(f"🧬 Gemini Error: {e}")
         return None
 
-# 5. UI - TWO STEP PROCESS
+# 5. UI - POLLINATIONS BROWSER BYPASS
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -113,54 +112,24 @@ with col2:
         
         if st.session_state['current_prompt']:
             if not st.session_state['render_image']:
-                if st.button("🎨 Paint Concept Art", use_container_width=True):
+                if st.button("🎨 Paint Concept Art (Pollinations AI)", use_container_width=True):
                     st.session_state['render_image'] = True
                     st.rerun()
             
             if st.session_state['render_image']:
                 clean_ai_prompt = urllib.parse.quote(st.session_state['current_prompt'])
-                clean_trend = urllib.parse.quote(f"{trend} tools")
-                
                 ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
-                fallback_url = f"https://loremflickr.com/1200/600/{clean_trend}"
                 
-                js_code = f"""
-                <div id="wrapper" style="text-align: center; font-family: sans-serif; color: white;">
-                    <p id="loader" style="background: #333; padding: 10px; border-radius: 5px;">⏳ Fetching Image... Please wait up to 15 seconds.</p>
-                    <img id="display-img" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
-                    
-                    <div id="error-box" style="display: none; background: #333; border: 1px solid #ff4444; padding: 20px; border-radius: 8px; text-align: left;">
-                        <h3 style="color: #ff4444; margin-top: 0;">⚠️ Browser Blocked The Image</h3>
-                        <p style="color: #ddd;">Your browser's <b>Adblocker</b>, <b>VPN</b>, or <b>Corporate Firewall</b> physically prevented the free images from loading.</p>
-                        <p style="color: #aaa; font-size: 0.9em; margin-bottom: 0;"><i>(We tried to load the AI Image, and then the Stock Photo. Both were blocked by your computer before they could finish.)</i></p>
+                # HTML injection to force the local browser to fetch the image, bypassing Streamlit servers.
+                # Includes a simple fallback message if the browser extension blocks it.
+                st.markdown(f"""
+                    <div style="text-align: center; margin-top: 20px;">
+                        <p id="loading-text" style="color: gray; font-size: 0.9em; padding: 20px; background: #333; border-radius: 8px;">
+                            ⏳ Loading image from Pollinations AI...
+                        </p>
+                        <img src="{ai_url}" alt="AI Concept Art" 
+                             style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none;"
+                             onload="this.style.display='block'; document.getElementById('loading-text').style.display='none';"
+                             onerror="document.getElementById('loading-text').innerText='⚠️ Your browser (Adblock/VPN) blocked Pollinations AI.'; document.getElementById('loading-text').style.color='#ff4444';">
                     </div>
-                </div>
-                <script>
-                    const img = document.getElementById("display-img");
-                    const loader = document.getElementById("loader");
-                    const errorBox = document.getElementById("error-box");
-                    
-                    let attempts = 0;
-                    
-                    img.onload = function() {{
-                        loader.style.display = "none";
-                        img.style.display = "block";
-                    }};
-                    
-                    img.onerror = function() {{
-                        attempts++;
-                        if (attempts === 1) {{
-                            // First failure: AI Image blocked. Try stock photo.
-                            img.src = "{fallback_url}";
-                        }} else if (attempts === 2) {{
-                            // Second failure: Stock photo ALSO blocked. Kill loop and show error.
-                            loader.style.display = "none";
-                            errorBox.style.display = "block";
-                        }}
-                    }};
-                    
-                    // Start the process
-                    img.src = "{ai_url}";
-                </script>
-                """
-                components.html(js_code, height=650)
+                """, unsafe_allow_html=True)
