@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import urllib.parse
+import random
 import os
 from dotenv import load_dotenv
 
@@ -28,8 +29,6 @@ if 'current_strategy' not in st.session_state:
     st.session_state['current_strategy'] = None
 if 'current_prompt' not in st.session_state:
     st.session_state['current_prompt'] = None
-if 'render_image' not in st.session_state:
-    st.session_state['render_image'] = False
 
 # 2. API CONFIG
 load_dotenv()
@@ -83,14 +82,10 @@ def fetch_campaign(trend, channel):
         else:
             return {"strategy": raw_text, "image_prompt": f"Professional product photography representing the trend: {trend}"}
     except Exception as e:
-        error_msg = str(e)
-        if "429" in error_msg or "quota" in error_msg.lower():
-            st.error("⏳ **Gemini Speed Limit Reached (5 requests/min).** Please wait 30 seconds before clicking generate again.")
-        else:
-            st.error(f"🧬 Gemini Error: {e}")
+        st.error(f"🧬 Gemini Error: {e}")
         return None
 
-# 5. UI - POLLINATIONS BROWSER BYPASS
+# 5. UI - BARE BONES HTML INJECTION
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -103,7 +98,6 @@ with col1:
             if res:
                 st.session_state['current_strategy'] = res.get("strategy")
                 st.session_state['current_prompt'] = res.get("image_prompt").replace('"', "'")
-                st.session_state['render_image'] = False
 
 with col2:
     if st.session_state['current_strategy']:
@@ -111,25 +105,18 @@ with col2:
         st.divider()
         
         if st.session_state['current_prompt']:
-            if not st.session_state['render_image']:
-                if st.button("🎨 Paint Concept Art (Pollinations AI)", use_container_width=True):
-                    st.session_state['render_image'] = True
-                    st.rerun()
+            st.info(f"📸 **Image Prompt:** {st.session_state['current_prompt']}")
             
-            if st.session_state['render_image']:
-                clean_ai_prompt = urllib.parse.quote(st.session_state['current_prompt'])
-                ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
-                
-                # HTML injection to force the local browser to fetch the image, bypassing Streamlit servers.
-                # Includes a simple fallback message if the browser extension blocks it.
-                st.markdown(f"""
-                    <div style="text-align: center; margin-top: 20px;">
-                        <p id="loading-text" style="color: gray; font-size: 0.9em; padding: 20px; background: #333; border-radius: 8px;">
-                            ⏳ Loading image from Pollinations AI...
-                        </p>
-                        <img src="{ai_url}" alt="AI Concept Art" 
-                             style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none;"
-                             onload="this.style.display='block'; document.getElementById('loading-text').style.display='none';"
-                             onerror="document.getElementById('loading-text').innerText='⚠️ Your browser (Adblock/VPN) blocked Pollinations AI.'; document.getElementById('loading-text').style.color='#ff4444';">
-                    </div>
-                """, unsafe_allow_html=True)
+            # Format the URL
+            clean_ai_prompt = urllib.parse.quote(st.session_state['current_prompt'])
+            # Add a random number to the URL to prevent the browser from caching a broken image
+            cache_buster = random.randint(1, 10000) 
+            ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true&cb={cache_buster}"
+            
+            # Pure, raw HTML injection. No Javascript.
+            st.markdown(f"""
+                <div style="text-align: center; margin-top: 10px;">
+                    <p style="color: gray; font-size: 0.8em;">(Attempting to load image from free server...)</p>
+                    <img src="{ai_url}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" alt="AI Image failed to load. The Pollinations server may be down." />
+                </div>
+            """, unsafe_allow_html=True)
