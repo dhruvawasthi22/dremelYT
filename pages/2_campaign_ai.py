@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import google.generativeai as genai
+import urllib.parse
 import os
 from dotenv import load_dotenv
 
@@ -34,16 +35,12 @@ if 'render_image' not in st.session_state:
 # 2. API CONFIG
 load_dotenv()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
-HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-3.5-flash') 
 else:
     st.error("❌ GEMINI API KEY MISSING.")
-
-if not HF_TOKEN:
-    st.warning("⚠️ HF_TOKEN missing in Streamlit Secrets. Image generation is disabled.")
 
 # 3. DATA
 @st.cache_data(ttl=3600)
@@ -87,10 +84,14 @@ def fetch_campaign(trend, channel):
         else:
             return {"strategy": raw_text, "image_prompt": f"Professional product photography representing the trend: {trend}"}
     except Exception as e:
-        st.error(f"🧬 Gemini Error: {e}")
+        error_msg = str(e)
+        if "429" in error_msg or "quota" in error_msg.lower():
+            st.error("⏳ **Gemini Speed Limit Reached (5 requests/min).** Please wait 30 seconds before clicking generate again.")
+        else:
+            st.error(f"🧬 Gemini Error: {e}")
         return None
 
-# 5. UI - SERVER BYPASS PROTOCOL
+# 5. UI - TWO STEP PROCESS
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -102,66 +103,44 @@ with col1:
             res = fetch_campaign(trend, channel)
             if res:
                 st.session_state['current_strategy'] = res.get("strategy")
-                st.session_state['current_prompt'] = res.get("image_prompt").replace('"', "'") # Clean quotes for JS
-                st.session_state['render_image'] = False # Reset image state
+                st.session_state['current_prompt'] = res.get("image_prompt").replace('"', "'")
+                st.session_state['render_image'] = False
 
 with col2:
     if st.session_state['current_strategy']:
         st.markdown(st.session_state['current_strategy'])
         st.divider()
         
-        if HF_TOKEN and st.session_state['current_prompt']:
-            
-            # Show the button if we haven't rendered the image yet
+        if st.session_state['current_prompt']:
             if not st.session_state['render_image']:
                 if st.button("🎨 Paint Concept Art", use_container_width=True):
                     st.session_state['render_image'] = True
                     st.rerun()
             
-            # If the button was clicked, inject the HTML/JS to force the browser to fetch the image
             if st.session_state['render_image']:
+                clean_ai_prompt = urllib.parse.quote(st.session_state['current_prompt'])
+                clean_trend = urllib.parse.quote(f"{trend} tools")
+                
+                ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true"
+                fallback_url = f"https://loremflickr.com/1200/600/{clean_trend}"
+                
                 js_code = f"""
-                <div id="image-container" style="text-align: center; font-family: sans-serif;">
-                    <p id="status" style="color: #ffffff; background: #333; padding: 10px; border-radius: 5px;">
-                        ⏳ Painting Concept Art via your browser... (Takes 30-45 seconds)
-                    </p>
-                    <img id="generated-image" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
-                    <div id="error-box" style="display: none; background: #ffcccc; color: #cc0000; padding: 15px; border-radius: 5px; text-align: left;">
-                        <h4 style="margin-top: 0;">🚨 Browser Fetch Failed</h4>
-                        <p id="error-msg" style="margin-bottom: 0; font-family: monospace;"></p>
-                    </div>
+                <div id="wrapper" style="text-align: center; font-family: sans-serif; color: white;">
+                    <p id="loader" style="background: #333; padding: 10px; border-radius: 5px;">⏳ Painting Concept Art... Please wait.</p>
+                    <img id="display-img" src="{ai_url}" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
                 </div>
                 <script>
-                    async function fetchImage() {{
-                        try {{
-                            const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {{
-                                method: "POST",
-                                headers: {{
-                                    "Authorization": "Bearer {HF_TOKEN}",
-                                    "Content-Type": "application/json"
-                                }},
-                                body: JSON.stringify({{inputs: "{st.session_state['current_prompt']}"}})
-                            }});
-
-                            if (!response.ok) {{
-                                const errText = await response.text();
-                                throw new Error("HTTP " + response.status + ": " + errText);
-                            }}
-
-                            const blob = await response.blob();
-                            const img = document.getElementById("generated-image");
-                            img.src = URL.createObjectURL(blob);
-                            img.style.display = "block";
-                            document.getElementById("status").style.display = "none";
-
-                        }} catch (error) {{
-                            document.getElementById("status").style.display = "none";
-                            document.getElementById("error-box").style.display = "block";
-                            document.getElementById("error-msg").innerText = error.message;
-                        }}
-                    }}
-                    fetchImage();
+                    const img = document.getElementById("display-img");
+                    const loader = document.getElementById("loader");
+                    
+                    img.onload = function() {{
+                        loader.style.display = "none";
+                        img.style.display = "block";
+                    }};
+                    
+                    img.onerror = function() {{
+                        img.src = "{fallback_url}";
+                    }};
                 </script>
                 """
-                # Render the HTML block (height ensures it has room to expand)
-                components.html(js_code, height=600)
+                components.html(js_code, height=650)
