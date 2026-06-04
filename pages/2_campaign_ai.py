@@ -1,8 +1,7 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import google.generativeai as genai
-import requests
-import time
 import os
 from dotenv import load_dotenv
 
@@ -29,8 +28,8 @@ if 'current_strategy' not in st.session_state:
     st.session_state['current_strategy'] = None
 if 'current_prompt' not in st.session_state:
     st.session_state['current_prompt'] = None
-if 'current_image' not in st.session_state:
-    st.session_state['current_image'] = None
+if 'render_image' not in st.session_state:
+    st.session_state['render_image'] = False
 
 # 2. API CONFIG
 load_dotenv()
@@ -88,54 +87,10 @@ def fetch_campaign(trend, channel):
         else:
             return {"strategy": raw_text, "image_prompt": f"Professional product photography representing the trend: {trend}"}
     except Exception as e:
-        error_msg = str(e)
-        if "429" in error_msg or "quota" in error_msg.lower():
-            st.error("⏳ **Gemini Speed Limit Reached (5 requests/min).** Please wait 30 seconds before clicking generate again.")
-        else:
-            st.error(f"🧬 Gemini Error: {e}")
+        st.error(f"🧬 Gemini Error: {e}")
         return None
 
-# --- FORENSIC DIAGNOSTIC IMAGE FUNCTION ---
-def fetch_huggingface_image(prompt_text):
-    api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": prompt_text}
-    
-    try:
-        # 1. Attempt the request with a strict 90-second timeout
-        response = requests.post(api_url, headers=headers, json=payload, timeout=90)
-        
-        # 2. If successful, return the image
-        if response.status_code == 200:
-            return response.content
-            
-        # 3. If the model is sleeping (503), catch it explicitly
-        if response.status_code == 503:
-            try:
-                err_json = response.json()
-                wait_time = err_json.get("estimated_time", 20)
-                raise Exception(f"503 Model Sleeping. Hugging Face says: 'Estimated wait {wait_time} seconds'. Try clicking the button again in a minute.")
-            except:
-                raise Exception(f"503 Model Sleeping. No estimated time provided. Raw text: {response.text}")
-                
-        # 4. If Hugging Face returns ANY other HTTP error (like 401, 403, 429), print the exact JSON payload
-        try:
-            err_json = response.json()
-            raise Exception(f"HTTP {response.status_code} Error from Hugging Face: {err_json}")
-        except:
-            raise Exception(f"HTTP {response.status_code} Error from Hugging Face: {response.text}")
-            
-    # 5. Catch pure network/connection failures (Streamlit container issues)
-    except requests.exceptions.Timeout:
-        raise Exception("NETWORK TIMEOUT: The request hit the 90-second limit. Hugging Face never responded.")
-    except requests.exceptions.ConnectionError as e:
-        raise Exception(f"CONNECTION FAILED: Streamlit could not reach the internet. Exact trace: {str(e)}")
-    except Exception as e:
-        # Catch anything else we explicitly raised above or unforeseen Python crashes
-        raise Exception(f"DIAGNOSTIC TRACE: {str(e)}")
-
-
-# 5. UI - TWO STEP PROCESS
+# 5. UI - SERVER BYPASS PROTOCOL
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -143,12 +98,12 @@ with col1:
     channel = st.text_input("Partner", value=best_channel, disabled=True)
     
     if st.button("🚀 Generate Campaign Strategy", type="primary", use_container_width=True):
-        with st.spinner("🧠 Strategizing with Gemini"):
+        with st.spinner("🧠 Strategizing with Gemini..."):
             res = fetch_campaign(trend, channel)
             if res:
                 st.session_state['current_strategy'] = res.get("strategy")
-                st.session_state['current_prompt'] = res.get("image_prompt")
-                st.session_state['current_image'] = None 
+                st.session_state['current_prompt'] = res.get("image_prompt").replace('"', "'") # Clean quotes for JS
+                st.session_state['render_image'] = False # Reset image state
 
 with col2:
     if st.session_state['current_strategy']:
@@ -157,16 +112,56 @@ with col2:
         
         if HF_TOKEN and st.session_state['current_prompt']:
             
-            if st.session_state['current_image']:
-                st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 AI Concept Art: {st.session_state['current_prompt']}")
-            
-            else:
+            # Show the button if we haven't rendered the image yet
+            if not st.session_state['render_image']:
                 if st.button("🎨 Paint Concept Art", use_container_width=True):
-                    with st.spinner("⏳ Requesting image from Hugging Face..."):
-                        try:
-                            image_bytes = fetch_huggingface_image(st.session_state['current_prompt'])
-                            st.session_state['current_image'] = image_bytes
-                            st.rerun() 
-                        except Exception as e:
-                            # This will print the EXACT, unfiltered error directly to your screen
-                            st.error(f"🚨 **RAW ERROR DATA:** {e}")
+                    st.session_state['render_image'] = True
+                    st.rerun()
+            
+            # If the button was clicked, inject the HTML/JS to force the browser to fetch the image
+            if st.session_state['render_image']:
+                js_code = f"""
+                <div id="image-container" style="text-align: center; font-family: sans-serif;">
+                    <p id="status" style="color: #ffffff; background: #333; padding: 10px; border-radius: 5px;">
+                        ⏳ Painting Concept Art via your browser... (Takes 30-45 seconds)
+                    </p>
+                    <img id="generated-image" style="width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+                    <div id="error-box" style="display: none; background: #ffcccc; color: #cc0000; padding: 15px; border-radius: 5px; text-align: left;">
+                        <h4 style="margin-top: 0;">🚨 Browser Fetch Failed</h4>
+                        <p id="error-msg" style="margin-bottom: 0; font-family: monospace;"></p>
+                    </div>
+                </div>
+                <script>
+                    async function fetchImage() {{
+                        try {{
+                            const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {{
+                                method: "POST",
+                                headers: {{
+                                    "Authorization": "Bearer {HF_TOKEN}",
+                                    "Content-Type": "application/json"
+                                }},
+                                body: JSON.stringify({{inputs: "{st.session_state['current_prompt']}"}})
+                            }});
+
+                            if (!response.ok) {{
+                                const errText = await response.text();
+                                throw new Error("HTTP " + response.status + ": " + errText);
+                            }}
+
+                            const blob = await response.blob();
+                            const img = document.getElementById("generated-image");
+                            img.src = URL.createObjectURL(blob);
+                            img.style.display = "block";
+                            document.getElementById("status").style.display = "none";
+
+                        }} catch (error) {{
+                            document.getElementById("status").style.display = "none";
+                            document.getElementById("error-box").style.display = "block";
+                            document.getElementById("error-msg").innerText = error.message;
+                        }}
+                    }}
+                    fetchImage();
+                </script>
+                """
+                # Render the HTML block (height ensures it has room to expand)
+                components.html(js_code, height=600)
