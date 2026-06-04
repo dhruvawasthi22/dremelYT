@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import requests
+import time
 import os
 from dotenv import load_dotenv
-import time
 
 # 1. SETUP
 st.set_page_config(page_title="Dremel | AI Campaign Architect", layout="wide", initial_sidebar_state="collapsed")
@@ -95,35 +95,45 @@ def fetch_campaign(trend, channel):
             st.error(f"🧬 Gemini Error: {e}")
         return None
 
-
-
+# --- FORENSIC DIAGNOSTIC IMAGE FUNCTION ---
 def fetch_huggingface_image(prompt_text):
     api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt_text}
     
-    # We will try up to 3 times in case the model is waking up
-    for attempt in range(3):
+    try:
+        # 1. Attempt the request with a strict 90-second timeout
         response = requests.post(api_url, headers=headers, json=payload, timeout=90)
         
+        # 2. If successful, return the image
         if response.status_code == 200:
             return response.content
             
-        elif response.status_code == 503:
-            # The model is sleeping. Get the estimated wait time, or default to 15 seconds.
-            error_data = response.json()
-            wait_time = error_data.get("estimated_time", 15.0)
+        # 3. If the model is sleeping (503), catch it explicitly
+        if response.status_code == 503:
+            try:
+                err_json = response.json()
+                wait_time = err_json.get("estimated_time", 20)
+                raise Exception(f"503 Model Sleeping. Hugging Face says: 'Estimated wait {wait_time} seconds'. Try clicking the button again in a minute.")
+            except:
+                raise Exception(f"503 Model Sleeping. No estimated time provided. Raw text: {response.text}")
+                
+        # 4. If Hugging Face returns ANY other HTTP error (like 401, 403, 429), print the exact JSON payload
+        try:
+            err_json = response.json()
+            raise Exception(f"HTTP {response.status_code} Error from Hugging Face: {err_json}")
+        except:
+            raise Exception(f"HTTP {response.status_code} Error from Hugging Face: {response.text}")
             
-            st.info(f"☕ Hugging Face model is waking up. Waiting {round(wait_time)} seconds to try again...")
-            time.sleep(wait_time) # Pause the code for the required time
-            continue # Loop back up and try again
-            
-        else:
-            # If it's a different error (like a bad API key), crash and show the error
-            raise Exception(f"API Error {response.status_code}: {response.text}")
-            
-    # If it fails 3 times, give up
-    raise Exception("The image server took too long to wake up. Please try again later.")
+    # 5. Catch pure network/connection failures (Streamlit container issues)
+    except requests.exceptions.Timeout:
+        raise Exception("NETWORK TIMEOUT: The request hit the 90-second limit. Hugging Face never responded.")
+    except requests.exceptions.ConnectionError as e:
+        raise Exception(f"CONNECTION FAILED: Streamlit could not reach the internet. Exact trace: {str(e)}")
+    except Exception as e:
+        # Catch anything else we explicitly raised above or unforeseen Python crashes
+        raise Exception(f"DIAGNOSTIC TRACE: {str(e)}")
+
 
 # 5. UI - TWO STEP PROCESS
 col1, col2 = st.columns([1, 2], gap="large")
@@ -132,39 +142,31 @@ with col1:
     trend = st.selectbox("Trend", top_trends_list, index=0)
     channel = st.text_input("Partner", value=best_channel, disabled=True)
     
-    # STEP 1: Fetch Text Only
     if st.button("🚀 Generate Campaign Strategy", type="primary", use_container_width=True):
-        with st.spinner("🧠 Strategizing with Gemini... (Takes ~2 seconds)"):
+        with st.spinner("🧠 Strategizing with Gemini"):
             res = fetch_campaign(trend, channel)
             if res:
-                # Save to memory so it doesn't disappear
                 st.session_state['current_strategy'] = res.get("strategy")
                 st.session_state['current_prompt'] = res.get("image_prompt")
-                st.session_state['current_image'] = None # Clear old image
+                st.session_state['current_image'] = None 
 
 with col2:
-    # Display the strategy immediately if it exists in memory
     if st.session_state['current_strategy']:
         st.markdown(st.session_state['current_strategy'])
         st.divider()
         
-        # STEP 2: The Opt-In Image Button
         if HF_TOKEN and st.session_state['current_prompt']:
             
-            # If we already generated the image, just show it
             if st.session_state['current_image']:
                 st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 AI Concept Art: {st.session_state['current_prompt']}")
             
-            # If we haven't generated it yet, show the button
             else:
                 if st.button("🎨 Paint Concept Art", use_container_width=True):
-                    with st.spinner("⏳ Waking up Stable Diffusion... (This takes about 30-45 seconds)"):
+                    with st.spinner("⏳ Requesting image from Hugging Face..."):
                         try:
-                            # Fetch and save to memory
                             image_bytes = fetch_huggingface_image(st.session_state['current_prompt'])
                             st.session_state['current_image'] = image_bytes
-                            st.rerun() # Refresh the page to show the image instantly
-                        except requests.exceptions.ConnectionError:
-                            st.error("⚠️ Streamlit Cloud momentarily lost its internet connection. Please click the button to try again.")
+                            st.rerun() 
                         except Exception as e:
-                            st.error(f"Image Generation Failed: {e}")
+                            # This will print the EXACT, unfiltered error directly to your screen
+                            st.error(f"🚨 **RAW ERROR DATA:** {e}")
