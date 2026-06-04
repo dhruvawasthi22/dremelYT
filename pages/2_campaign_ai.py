@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import urllib.parse
-import random
+from huggingface_hub import InferenceClient
+import io
 import os
 from dotenv import load_dotenv
 
@@ -29,16 +29,22 @@ if 'current_strategy' not in st.session_state:
     st.session_state['current_strategy'] = None
 if 'current_prompt' not in st.session_state:
     st.session_state['current_prompt'] = None
+if 'current_image' not in st.session_state:
+    st.session_state['current_image'] = None
 
 # 2. API CONFIG
 load_dotenv()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-3.5-flash') 
 else:
     st.error("❌ GEMINI API KEY MISSING.")
+
+if not HF_TOKEN:
+    st.warning("⚠️ Hugging Face Token missing. Image generation is disabled.")
 
 # 3. DATA
 @st.cache_data(ttl=3600)
@@ -85,7 +91,19 @@ def fetch_campaign(trend, channel):
         st.error(f"🧬 Gemini Error: {e}")
         return None
 
-# 5. UI - BARE BONES HTML INJECTION
+def fetch_hf_image(prompt_text):
+    # Using the official InferenceClient loaded with the Flux Schnell model
+    client = InferenceClient(model="black-forest-labs/FLUX.1-schnell", token=HF_TOKEN)
+    
+    # Generate the PIL Image object
+    image = client.text_to_image(prompt_text)
+    
+    # Convert PIL Image to bytes for Streamlit processing
+    img_byte_arr = io.BytesIO()
+    image.save(img_byte_arr, format='PNG')
+    return img_byte_arr.getvalue()
+
+# 5. UI
 col1, col2 = st.columns([1, 2], gap="large")
 
 with col1:
@@ -97,26 +115,25 @@ with col1:
             res = fetch_campaign(trend, channel)
             if res:
                 st.session_state['current_strategy'] = res.get("strategy")
-                st.session_state['current_prompt'] = res.get("image_prompt").replace('"', "'")
+                st.session_state['current_prompt'] = res.get("image_prompt")
+                st.session_state['current_image'] = None 
 
 with col2:
     if st.session_state['current_strategy']:
         st.markdown(st.session_state['current_strategy'])
         st.divider()
         
-        if st.session_state['current_prompt']:
-            st.info(f"📸 **Image Prompt:** {st.session_state['current_prompt']}")
+        if HF_TOKEN and st.session_state['current_prompt']:
             
-            # Format the URL
-            clean_ai_prompt = urllib.parse.quote(st.session_state['current_prompt'])
-            # Add a random number to the URL to prevent the browser from caching a broken image
-            cache_buster = random.randint(1, 10000) 
-            ai_url = f"https://image.pollinations.ai/prompt/{clean_ai_prompt}?width=1200&height=600&nologo=true&cb={cache_buster}"
+            if st.session_state['current_image']:
+                st.image(st.session_state['current_image'], use_container_width=True, caption=f"🎨 Flux Concept Art: {st.session_state['current_prompt']}")
             
-            # Pure, raw HTML injection. No Javascript.
-            st.markdown(f"""
-                <div style="text-align: center; margin-top: 10px;">
-                    <p style="color: gray; font-size: 0.8em;">(Attempting to load image from free server...)</p>
-                    <img src="{ai_url}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" alt="AI Image failed to load. The Pollinations server may be down." />
-                </div>
-            """, unsafe_allow_html=True)
+            else:
+                if st.button("🎨 Paint Concept Art (Hugging Face)", use_container_width=True):
+                    with st.spinner("⏳ Generating Flux image via Hugging Face SDK..."):
+                        try:
+                            image_bytes = fetch_hf_image(st.session_state['current_prompt'])
+                            st.session_state['current_image'] = image_bytes
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Image Generation Failed: {e}")
